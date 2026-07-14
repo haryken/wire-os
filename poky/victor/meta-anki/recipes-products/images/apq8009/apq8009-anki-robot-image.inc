@@ -11,7 +11,6 @@ IMAGE_INSTALL += "wipe-all-wifi-configs"
 
 # Victor stuff
 IMAGE_INSTALL += "vic-anim"
-IMAGE_INSTALL += "${@oe.utils.conditional('CLOUDLESS', '1', 'vic-cloudless', 'vic-cloud', d)}"
 IMAGE_INSTALL += "vic-engine"
 IMAGE_INSTALL += "vic-gateway-cert"
 IMAGE_INSTALL += "vic-init"
@@ -19,6 +18,8 @@ IMAGE_INSTALL += "vic-robot"
 IMAGE_INSTALL += "vic-switchboard"
 IMAGE_INSTALL += "vic-bootanim"
 IMAGE_INSTALL += "victor"
+# After victor so cloudless / dedicated cloud is not overwritten by victor's C++ vic-cloud
+IMAGE_INSTALL += "${@oe.utils.conditional('CLOUDLESS', '1', 'vic-cloudless', 'vic-cloud', d)}"
 
 # Wire things
 IMAGE_INSTALL += "wired"
