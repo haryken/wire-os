@@ -6,10 +6,19 @@ PartOf=anki-robot.target
 Wants=vic-robot.service
 Requires=anki-audio-init.service
 After=vic-robot.service anki-audio-init.service
+# Limit crash-loop restarts (Xiaozhi TTS/camera can pressure page cache).
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 EnvironmentFile=/anki/etc/vic-anim.env
-Restart=no
+# Auto-recover after unexpected exit so face does not stick on fault 800
+# (NO_ANIM_PROCESS) until a full anki-robot.target restart.
+Restart=on-failure
+RestartSec=2
+# Android-style LMK kills adj 0 when page cache dips under ~6MB during
+# Xiaozhi chat + analyze_photo — protect anim so the face stays up.
+OOMScoreAdjust=-900
 ExecStartPre=-/bin/systemctl stop vic-bootAnim.service
 ExecStart=/usr/bin/logwrapper /anki/bin/vic-anim $VIC_ANIM_OPTS
 ExecStopPost=/anki/bin/vic-on-exit
