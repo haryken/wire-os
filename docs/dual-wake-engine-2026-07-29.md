@@ -32,6 +32,14 @@ Taken **before** this feature was applied:
 
 Stock THF source reference: `/home/linh/Projects/victor` branch **`master`**.
 
+### Post-change commits (this feature)
+
+| Repo | SHA |
+|------|-----|
+| `wire-os` (parent) | `eb0ab605a` |
+| `anki/victor` | `cc05229c` |
+| `anki/wired` | `2faa3cf` |
+
 ---
 
 ## What this change touches
