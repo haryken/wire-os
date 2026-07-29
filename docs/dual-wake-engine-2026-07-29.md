@@ -4,8 +4,8 @@
 
 | Engine | Behavior |
 |--------|----------|
-| **picovoice** (default WireOS) | Custom keyword + `sensitivity2`; current path |
-| **thf** | Stock Anki Sensory TrulyHandsFree; locale en-US/AU/GB/FR/DE via bot locale |
+| **picovoice** | Custom keyword + `sensitivity2` |
+| **thf** (WireOS OTA default) | Stock Anki Sensory TrulyHandsFree; Giọng THF model (en-AU default) |
 
 Config file on robot:
 
@@ -13,7 +13,14 @@ Config file on robot:
 /data/data/com.anki.victor/persistent/wake_engine
 ```
 
-Contents: `picovoice` or `thf` (one line, no quotes). Missing file → **picovoice**.
+Contents: `picovoice` or `thf` (one line, no quotes). Missing file → **thf** (WireOS OTA default).
+
+Fresh OTA / wipe defaults:
+
+| Setting | Default |
+|---------|---------|
+| Wake engine | **thf** (Hey Vector Sensory) |
+| Robot locale / Giọng THF | **en-AU** (`settings_config.json`) |
 
 Changing engine requires **restart `vic-anim`** (wired API does this via Save).
 
