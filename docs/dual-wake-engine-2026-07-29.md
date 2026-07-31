@@ -56,11 +56,13 @@ Stock THF source reference: `/home/linh/Projects/victor` branch **`master`**.
 - Add `speechRecognizerTHFSimple.*`, `speechRecognizerTHFTypesSimple.*`
 - Add `3rd/sensory` (+ `cmake/sensory.cmake` already present)
 - Symlink `resources/assets/sensorySpeechRecModels` → `../../3rd/sensory/sensorySpeechRecModels`
+- **`resources/BUILD.in`** must list `('3rd/sensory', 'sensorySpeechRecModels/**/*')` in `cozmo_resources_assets` (symlink alone is **not** packaged into OTA — missing models → THF wake fails with `thfRecogCreateFromFile`)
 - `animProcess/CMakeLists.txt` — `include(sensory)`, link `${SENSORY_LIBS}`
 - `speechRecognizerSystem.h` / `.cpp` — `_victorTrigger` (PV) **or** `_victorTriggerThf`, read `wake_engine`
 - Clang fix: name `std::lock_guard` locals (Wunused-value / nodiscard under `-Werror`)
 - After pull: regenerate source lists if needed:
   `python3 tools/build/tools/metabuild/metabuild.py -o generated/cmake animProcess/BUILD.in`
+  `python3 tools/build/tools/metabuild/metabuild.py -o generated/cmake resources/BUILD.in`
 
 ### `anki/wired`
 
