@@ -13,13 +13,14 @@ ESP32 stores `websocket.token` from OTA into NVS automatically — no settings U
 ## Done this change
 
 - Remove Unpair button + help that pushed local unpair.
-- Hide Token input; keep `token` in `xiaozhi.json` (Get Code / Refresh / auto-apply OTA still write it).
+- Hide Token input; keep `token` in `xiaozhi.json` (Get Code / auto-apply OTA / boot `OtaCheck` still write it).
+- Remove **Refresh** button from UI (redundant with Get Code + boot OTA; API `refresh` kept for debug).
 - Mode = radio Xiaozhi ↔ Vosk; apply immediately (`set_enabled` + restart `vic-cloud`).
 - Save only updates Xiaozhi config fields (not mode).
 
 ## Optional later (not required for UX)
 
-1. Drop `unpair` HTTP endpoint in `wired/mods/xiaozhi.go` (or leave unused).
+1. Drop `unpair` / `refresh` HTTP endpoints in `wired/mods/xiaozhi.go` (or leave unused).
 2. Stop accepting `token=` on `save` (only OTA paths write token).
 3. Mask token in `get` JSON for the web (`token_set: true` instead of raw value) if we ever show status.
 4. Do **not** delete the JSON field until cloud stops sending Authorization.
