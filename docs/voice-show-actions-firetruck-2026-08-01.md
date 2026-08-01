@@ -9,6 +9,8 @@ Dùng doc này để:
 1. Thêm action tương tự (siren khác, Codelab show, …)  
 2. Revert sạch nếu không ổn  
 
+**Checklist ngắn (đủ 8 bước):** anim (+ manifest) → audio (+ SoundbankBundleInfo) → `user_intent_map` → Vosk overlay/`en-US` → MCP `mcp.go` → **web `:8080` `index.html`** → deploy → test.
+
 ---
 
 ## Luồng runtime (giống action khác)
@@ -140,13 +142,27 @@ Cập nhật `vectorActionToolDescription()` nếu muốn LLM ưu tiên action m
 
 Build + deploy `vic-cloud`.
 
-### 6) Deploy / test
+### 6) Hướng dẫn web `:8080` (**bắt buộc**)
+
+Tab **Lệnh thoại (Voice)** trên wired UI phải liệt kê phrase mới — user đọc từ đây, không chỉ từ repo docs.
+
+| Việc | Path |
+|------|------|
+| Thêm phrase Xiaozhi + Vosk | `anki/wired/webroot/index.html` — section `#voice` (`voice-mode-xz` và `voice-mode-vosk`) |
+| Deploy UI | copy `webroot/` → `/etc/wired/webroot` (hoặc OTA wired) rồi soft-refresh trình duyệt |
+
+Mẫu Firetruck: nhóm **🚒 Show ngắn** / **Short shows** + dòng trong mục chào / chat ngắn.
+
+**Mỗi lần thêm show-action mới → cập nhật `index.html` cùng commit** (đừng chỉ sửa MD repo).
+
+### 7) Deploy / test
 
 1. Build/deploy **victor** resources (anim + group + sound) — hoặc copy thủ công lên robot rồi restart `vic-anim` / `anki-robot.target`.  
 2. Deploy **cloudless** (en-US + binary nếu đổi MCP).  
-3. Test Vosk: wake → nói phrase.  
-4. Test Xiaozhi: “làm xe cứu hỏa” → tool `firetruck`.  
-5. Tab Nhật ký `:8080` → `vic-anim` / `vic-cloud`: không missing anim / Wwise event.
+3. Deploy **wired webroot** (bước 6) — kiểm tra tab Lệnh thoại `:8080`.  
+4. Test Vosk: wake → nói phrase.  
+5. Test Xiaozhi: “làm xe cứu hỏa” → tool `firetruck`.  
+6. Tab Nhật ký `:8080` → `vic-anim` / `vic-cloud`: không missing anim / Wwise event.
 
 **Checklist deploy Firetruck (robot):**
 
@@ -201,11 +217,17 @@ Nguồn anim/SFX: Viccyware (`resources/.../anim_petdetection_dog_02.json`, `Mis
 | `internal/xiaozhi/mcp.go` | `vectorActions` id `firetruck` + hint trong tool description |
 | `internal/xiaozhi/alsa_player.go` | Gap keepalive TTS (không phải firetruck; cùng đợt fix rè) |
 
+### Wired UI (`anki/wired`)
+
+| File | Vai trò |
+|------|---------|
+| `webroot/index.html` (`#voice`) | Hướng dẫn user trên `:8080` — phrase firetruck / xe cứu hỏa (Xiaozhi + Vosk) |
+
 ### Docs (repo root)
 
 | File | Vai trò |
 |------|---------|
-| `docs/voice-show-actions-firetruck-2026-08-01.md` | Doc này |
+| `docs/voice-show-actions-firetruck-2026-08-01.md` | Doc này (dev); **không** thay thế bảng Lệnh thoại trên web |
 
 ---
 
@@ -269,4 +291,5 @@ Firetruck-style = **chỉ 1 show anim** → giữ simple_voice.
 - Firetruck **không** gắn PetDetection vision; voice dùng group riêng `ag_voice_firetruck`.  
 - Phrase Vosk substring match — tránh keyphrase quá ngắn dễ đụng nhầm.  
 - Xiaozhi: LLM phải gọi MCP `firetruck`; nếu chỉ chat, kiểm tra tool description / prompt.  
-- OTA: `Missing_sfx.bnk` ~15MB — cân nhắc size image.
+- OTA: `Missing_sfx.bnk` ~15MB — cân nhắc size image.  
+- **Luôn** cập nhật hướng dẫn tab Lệnh thoại `:8080` (`wired/webroot/index.html`) khi thêm/xóa show-action — MD repo chỉ cho dev.
