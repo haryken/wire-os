@@ -1,16 +1,16 @@
 [submodule "anki/victor"]
 	path = anki/victor
-	url = https://github.com/os-vector/wire-os-victor
+	url = git@github.com:haryken/wire-os-victor.git
 [submodule "poky/meta-openembedded"]
 	path = poky/meta-openembedded
 	url = https://github.com/openembedded/meta-openembedded
 	branch = whinlatter
 [submodule "anki/wired"]
 	path = anki/wired
-	url = https://github.com/os-vector/wired
+	url = git@github.com:haryken/wired.git
 [submodule "anki/vic-cloudless"]
 	path = anki/vic-cloudless
-	url = https://github.com/kercre123/vic-cloudless
+	url = git@github.com:haryken/vic-cloudless.git
 [submodule "poky/bitbake"]
 	path = poky/bitbake
 	url = https://github.com/openembedded/bitbake.git
