@@ -14,6 +14,8 @@ ExecStartPre=/bin/chgrp anki /dev/block/bootdevice/by-name/emr
 ExecStart=/anki/bin/vic-robot $VIC_ROBOT_OPTS
 ExecStopPost=/anki/bin/vic-on-exit
 Restart=no
+# Protect spine/robot process from LMK under Xiaozhi RAM spikes.
+OOMScoreAdjust=-900
 User=robot
 Group=anki
 UMask=0002

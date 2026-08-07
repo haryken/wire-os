@@ -136,7 +136,7 @@ do_install() {
     install -d ${D}/etc/sudoers.d
     install -d ${D}/usr/sbin
 
-    install -m 0755 ${WORKSPACE}/anki/vic-cloudless/build/vic-* ${D}/anki/bin/
+    install -m 0550 ${WORKSPACE}/anki/vic-cloudless/build/vic-* ${D}/anki/bin/
     install -m 0644 ${WORKSPACE}/anki/vic-cloudless/build/lib* ${D}/anki/lib/
     cp -r ${WORKSPACE}/anki/vic-cloudless/build/en-US ${D}/anki/data/assets/cozmo_resources/cloudless/
 

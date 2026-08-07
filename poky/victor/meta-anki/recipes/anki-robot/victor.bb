@@ -241,6 +241,12 @@ do_install () {
   install -m 0755 ${D}/anki/lib/libunwind.so.1 ${D}/usr/lib/
   # no need to ship these twice
   rm -f ${D}/anki/lib/libc++.so.1 ${D}/anki/lib/libc++abi.so.1 ${D}/anki/lib/libunwind.so.1
+
+  # IMAGE_INSTALL already adds vic-cloud or vic-cloudless. The C++ cloud binary
+  # from this recipe must not overwrite cloudless (~24MB) on CLOUDLESS builds.
+  if ${@oe.utils.conditional('CLOUDLESS', '1', 'true', 'false', d)}; then
+    rm -f ${D}/anki/bin/vic-cloud
+  fi
 }
 
 do_generate_victor_canned_fs_config () {
@@ -252,7 +258,13 @@ anki/bin/displayFaultCode         ${UID_ENGINE} ${GID_ANKI} 0550
 anki/bin/update-engine            ${UID_NET}    ${GID_ANKI} 0550
 anki/bin/vic-anim                 ${UID_ENGINE} ${GID_ANKI} 0500
 anki/bin/vic-bootAnim             ${UID_ENGINE} ${GID_ANKI} 0550
+EOF
+  if [ "${CLOUDLESS}" != "1" ]; then
+    cat >> ${CANNED_FS_CONFIG_PATH} <<EOF
 anki/bin/vic-cloud                ${UID_CLOUD}  ${GID_ANKI} 0550
+EOF
+  fi
+  cat >> ${CANNED_FS_CONFIG_PATH} <<EOF
 anki/bin/vic-crashuploader-init   ${UID_NET}    ${GID_ANKI} 0550
 anki/bin/vic-crashuploader        ${UID_NET}    ${GID_ANKI} 0550
 anki/bin/vic-dasmgr               ${UID_NET}    ${GID_ANKI} 0500
