@@ -1,0 +1,58 @@
+---
+description: WireOS nested submodule commit/push workflow (haryken forks)
+alwaysApply: true
+---
+
+# WireOS Git Submodule Workflow
+
+This project uses **nested Git submodules**. Before any commit/push task, read:
+
+`docs/GIT_SUBMODULE_WORKFLOW.md`
+
+## Required branch
+
+`xiaozhi-wireos-save-2026-07-14`
+
+- Applies to: `wire-os`, `anki/victor`, `anki/victor/EXTERNALS`, `anki/wired`, `anki/vic-cloudless`
+- Always push that branch only
+- Never push/checkout/merge/rebase onto `main` or `master` unless the user explicitly asks
+- If a WireOS repo is on another branch, stop and report — do not auto-checkout
+
+## Owned repos (haryken)
+
+| Path | Origin |
+|------|--------|
+| `.` (wire-os) | `git@github.com:haryken/wire-os.git` |
+| `anki/victor` | `git@github.com:haryken/wire-os-victor.git` |
+| `anki/victor/EXTERNALS` | `git@github.com:haryken/wire-os-externals.git` |
+| `anki/wired` | `git@github.com:haryken/wired.git` |
+| `anki/vic-cloudless` | `git@github.com:haryken/vic-cloudless.git` |
+
+## Community deps — do not touch unless asked
+
+`external/purplpkg`, `poky/bitbake`, `poky/meta-openembedded`, `poky/openembedded-core`
+
+If dirty: report only. No commit/push/reset/clean/discard.
+
+## Commit/push order (inside → outside)
+
+- EXTERNALS changes: `EXTERNALS` → `victor` → `wire-os`
+- wired changes: `wired` → `wire-os`
+- vic-cloudless changes: `vic-cloudless` → `wire-os`
+- Multiple children: EXTERNALS → victor → wired → vic-cloudless → **wire-os last**
+
+Parent stores submodule **SHA pointers**, not full child trees. Push the child before committing the parent pointer.
+
+## Inspect before staging
+
+When the user asks to commit/push/save to GitHub:
+
+1. Inspect parent + `git submodule foreach --recursive` status/branch/remote
+2. Do **not** blindly `git add .`
+3. Stage only inspected, appropriate files (source/config/needed assets/pointers)
+4. Ask about unclear binaries, secrets, large/temp files
+5. Never force-push; never rewrite history for LFS/size issues without asking
+
+## After push
+
+Report SHAs, branches, remotes, updated pointers, remaining dirty/untracked state, and any errors.
