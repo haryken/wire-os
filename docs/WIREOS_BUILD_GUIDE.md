@@ -74,35 +74,26 @@ Yocto/OpenEmbedded (Poky) inside Docker image `vic-yocto-builder-7`, or bare met
 
 Yes — this **is** the top-level build. Component recipes still compile `victor`, `wired`, `vic-cloud`/`vic-cloudless`, etc. as part of the image.
 
-### Commands
+### Commands (canonical for this project)
 
-**VERIFIED** — `README.md` + `build/build.sh`:
+**Đây là lệnh OTA mặc định cần dùng.** Không cần thêm flag khác trừ khi user yêu cầu rõ.
+
+**VERIFIED** — `build/build.sh` accepts `-bt devcloudless`; sets `CLOUDLESS=1` via `set_bb_env.sh` `build-devcloudless`; installs `vic-cloudless` instead of C++ `vic-cloud` (`apq8009-anki-robot-image.inc`).
+
+Từ root `wire-os`:
 
 ```bash
-# From wire-os root, Docker (recommended in README)
-./build/build.sh -bt dev -v <build-increment>
-
-# Bare metal
-./build/build.sh -nd -bt dev -v <build-increment>
+./build/build.sh -bt devcloudless -v 100
 ```
 
-**VERIFIED** flags documented in `README.md`:
-
-| Flag | Meaning |
+| Phần | Ý nghĩa |
 |------|---------|
-| `-bt <dev\|oskr>` | Build type (README). Script also accepts `prod` / `devcloudless` (**VERIFIED** in `build/build.sh`, not fully documented in README flags section). |
-| `-v <0-9999>` | Version increment |
-| `-bp <password>` | Boot signing password (not required for dev) |
-| `-nd` | No Docker |
-| `-ui <…>` | BitBake UI |
+| `-bt devcloudless` | Image cloudless (Xiaozhi / `vic-cloudless`) |
+| `-v 100` | Increment phiên bản → artifact `vicos-3.0.1.100d.ota` |
 
-**VERIFIED** — cloudless image path via bot type:
+Đổi số sau `-v` khi muốn increment khác (0–9999). Ví dụ `-v 101` → `vicos-3.0.1.101d.ota`.
 
-```bash
-./build/build.sh -bt devcloudless -v <N>
-```
-
-Sets `CLOUDLESS=1` so image installs `vic-cloudless` instead of C++ `vic-cloud` (**VERIFIED** `apq8009-anki-robot-image.inc` + `set_bb_env.sh` `build-devcloudless`).
+Agent/AI: khi user nói “build OTA” / “build full” / “build image” mà không chỉ định type khác → **chỉ chạy lệnh trên** (có thể đổi `-v` theo user).
 
 ### Output
 
@@ -110,7 +101,7 @@ Sets `CLOUDLESS=1` so image installs `vic-cloudless` instead of C++ `vic-cloud` 
 |------|-------------|
 | BitBake deploy images | `poky/build/tmp-glibc/deploy/images/apq8009-robot-robot-perf/` (**VERIFIED** `ota/Makefile`) |
 | OTA output dir | `_build/` (**VERIFIED** `ota/Makefile`) |
-| Observed OTA name | `_build/vicos-3.0.1.<N>d.ota` for dev (**VERIFIED** files present under `_build/`, e.g. `vicos-3.0.1.100d.ota`) |
+| OTA với lệnh trên | `_build/vicos-3.0.1.100d.ota` (**VERIFIED** naming + on-disk example) |
 
 **Discrepancy (document as found):** root `README.md` says `./_build/3.0.1.<increment>.ota`. Actual packaging + `upload.sh` + on-disk artifacts use `vicos-$(os-version).ota` with a `d` / `oskr` suffix from `anki-version.bb`. Prefer `vicos-*.ota` when looking for artifacts.
 
@@ -466,18 +457,19 @@ ssh -i ~/ssh_root_key root@<ip> 'systemctl is-active wired vic-cloud anki-robot.
 | “build wired” / deploy wired / web UI | §4 Wired (+ §8 hot-deploy) |
 | “build victor” / deploy `/anki` / anim/engine | §3 Victor (+ §8) |
 | “build vic-cloudless” / Xiaozhi cloud / vic-cloud Go | §5 Vic-cloudless (+ §8) |
-| “build OTA” / full image / Yocto / `vicos-*.ota` | §2 Full OS / OTA (+ §7) |
+| “build OTA” / full image / Yocto / `vicos-*.ota` | §2 → chạy `./build/build.sh -bt devcloudless -v 100` |
 | “build service vic-anim / vic-engine / …” | §6 (bins from Victor) + §3 |
 | “hot deploy” / replace binary only | §8 + matching component section |
-| “cloudless image” | §2 (`-bt devcloudless`) + §5 |
-| “where is the OTA file?” | §2 Output (`_build/vicos-*.ota`) |
+| “cloudless image” | §2 (cùng lệnh OTA mặc định) + §5 |
+| “where is the OTA file?” | §2 → `_build/vicos-3.0.1.100d.ota` (hoặc `.<N>d.ota` theo `-v`) |
 | Git commit/push of build changes | `docs/GIT_SUBMODULE_WORKFLOW.md` |
 
 **Agent checklist before running a build**
 
 1. Confirm which component the user wants (wired / victor / cloudless / full OTA).  
-2. Open the matching section; prefer **VERIFIED** commands.  
-3. Check toolchain/SDK presence (`~/.anki/vicos-sdk`, Go dist) before `make`.  
-4. For hot-deploy, confirm robot IP + SSH key; remount/rootfs implications are in the scripts.  
-5. Do not claim a command works if marked **UNVERIFIED**.  
-6. After code changes, follow `docs/GIT_SUBMODULE_WORKFLOW.md` for commit/push order.
+2. Full OTA → **only** `./build/build.sh -bt devcloudless -v 100` (đổi `-v` nếu user chỉ định).  
+3. Open the matching section; prefer **VERIFIED** commands.  
+4. Check toolchain/SDK presence (`~/.anki/vicos-sdk`, Go dist) before `make`.  
+5. For hot-deploy, confirm robot IP + SSH key; remount/rootfs implications are in the scripts.  
+6. Do not claim a command works if marked **UNVERIFIED**.  
+7. After code changes, follow `docs/GIT_SUBMODULE_WORKFLOW.md` for commit/push order.
