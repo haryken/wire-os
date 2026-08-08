@@ -54,7 +54,7 @@ When to use full OTA vs hot-deploy:
 | New base OS, rootfs, many packages, version bump | Full Yocto OTA |
 | Iterate `wired` UI/API only | Standalone wired + hot-deploy |
 | Iterate Xiaozhi/cloudless only | Standalone vic-cloudless + hot-deploy |
-| Iterate anim/engine/robot under `/anki` on an existing good OTA | Standalone victor + deploy-v |
+| Iterate anim/engine/robot under `/anki` on an existing good OTA | Standalone victor build + **§8.1 binary scp** when possible; full deploy-v only if many files — then `vic-cloudless/deploy.sh` if cloudless |
 
 Root README states victor standalone deploy is the usual day-to-day path when a modern base WireOS OTA is already on the robot (**VERIFIED** `README.md` “Development path”).
 
@@ -164,6 +164,29 @@ source setenv.sh
 vbuild                      # alias → victor_build_release
 ```
 
+**VERIFIED (WSL / no Docker, 2026-08-08):** `./build/build-v.sh` and `./build/deploy-v.sh` use `docker … -it` and fail when Docker Desktop WSL integration is off. Prefer bare-metal scripts **by path** (aliases from `setenv.sh` do **not** expand in non-interactive agent shells):
+
+```bash
+cd anki/victor
+echo '192.168.x.x' > robot_ip.txt   # required for deploy; one IP per line
+export PATH="$HOME/.local/bin:$PATH"  # ninja + ccache shim live here on this machine
+
+# Fix stale absolute paths if CMake was configured when /usr/bin/{ninja,ccache} existed
+sed -i "s|/usr/bin/ninja|$HOME/.local/bin/ninja|g" _build/vicos/Release/CMakeCache.txt 2>/dev/null || true
+sed -i "s|/usr/bin/ccache|$HOME/.local/bin/ccache|g" \
+  _build/vicos/Release/CMakeCache.txt \
+  _build/vicos/Release/launch-c \
+  _build/vicos/Release/launch-cxx 2>/dev/null || true
+
+./project/victor/scripts/victor_build_release.sh
+```
+
+Notes (**VERIFIED** this workspace):
+
+- `~/.local/bin/ninja` exists; CMake may still cache `CMAKE_MAKE_PROGRAM=/usr/bin/ninja` → configure fails until patched.
+- `~/.local/bin/ccache` is a **passthrough shim** (`exec "$@"`), not real ccache. Generated `launch-c` / `launch-cxx` may hardcode `/usr/bin/ccache` (missing) → every compile fails until patched to `$HOME/.local/bin/ccache`.
+- SSH key file: `anki/victor/robot_sshkey` (**VERIFIED** present). Add to agent before deploy: `eval $(ssh-agent) && ssh-add robot_sshkey`.
+
 Clean (**VERIFIED** README):
 
 ```bash
@@ -216,11 +239,44 @@ cd anki/victor
 ./build/deploy-v.sh        # or: source setenv.sh && vdeploy
 ```
 
+**VERIFIED (bare metal / agent, 2026-08-08)** — when Docker is unavailable:
+
+```bash
+cd anki/victor
+echo '192.168.x.x' > robot_ip.txt
+eval $(ssh-agent) && ssh-add robot_sshkey
+export ANKI_ROBOT_HOST=$(cat robot_ip.txt)
+./project/victor/scripts/victor_deploy_run.sh
+# = stop → stage → rsync → restart
+```
+
 Notes from scripts (**VERIFIED**):
 
-- Expects robot IP/key files (`robot_ip.txt`, `robot_sshkey` in victor tree — exact local setup **UNVERIFIED** on this machine).
+- Expects `robot_ip.txt` + `robot_sshkey` in the victor tree (**VERIFIED** key present; write IP before deploy).
 - Stops `anki-robot.target`, rsyncs staged tree to robot (`rsync://…:1873/anki_root/` in deploy script).
 - Checks `/etc/os-version` and `/etc/victor-compat-version` compatibility.
+
+**CRITICAL — cloudless wipe (**VERIFIED** 2026-08-08 on robot):**  
+Victor staging/`deploy.sh` rsync **deletes** files under `/anki` that are not in the victor stage — including:
+
+- `/anki/data/assets/cozmo_resources/cloudless/` (Vosk models + `en-US.json`)
+- `/anki/bin/xiaozhi-play-bridge.sh` (and related cloudless extras)
+
+After **any** full victor hot-deploy onto a cloudless robot, **always** re-run:
+
+```bash
+cd anki/vic-cloudless
+./deploy.sh <robot-ip>    # restores cloudless + bridge; restarts anki-robot.target (~70MB, often slow)
+```
+
+**Prefer avoiding the wipe:** for engine-only C++ changes use binary scp (§8.1) instead of full `victor_deploy_run`.
+
+Verify engine picked up C++ changes:
+
+```bash
+ssh -i ~/ssh_root_key root@<ip> \
+  'strings /anki/lib/libcozmo_engine.so | grep -F /data/wired/mods/Petting/touch_enabled'
+```
 
 ---
 
@@ -241,7 +297,19 @@ Go cross-compile to ARM.
 
 **VERIFIED** both scripts/files as above. Prefer `make` for Yocto alignment.
 
-**Caveat:** `Makefile` references `vector-gobot` (`libvector-gobot` target / CGO paths). That directory may be absent in a thin checkout (**VERIFIED** missing in this workspace at time of writing). If `make` fails for that reason, fix/restore `vector-gobot` rather than inventing a new official script.
+**Caveat:** `Makefile` references `vector-gobot` (`libvector-gobot` target / CGO paths). That directory may be absent in a thin checkout (**VERIFIED** missing in this workspace).
+
+**VERIFIED workaround (2026-08-08):** current `anki/wired` Go sources do **not** import `C` / gobot. When `vector-gobot/` is missing, cross-compile without CGO (static ARM binary still runs on robot):
+
+```bash
+cd anki/wired
+mkdir -p build
+CGO_ENABLED=0 GOARM=7 GOARCH=arm GOOS=linux \
+  "$HOME/.anki/go/dist/1.24.4/go/bin/go" build -tags vicos -ldflags '-w -s' -o build/wired main.go
+./send_to_bot.sh <robot-ip>
+```
+
+Prefer `make` when `vector-gobot` is restored (Yocto-aligned). Do not invent other official scripts.
 
 ### Can it be built separately?
 
@@ -249,7 +317,7 @@ Go cross-compile to ARM.
 
 ### Build commands
 
-**VERIFIED** — `anki/wired/Makefile`:
+**VERIFIED** — `anki/wired/Makefile` (needs `vector-gobot`):
 
 ```bash
 cd anki/wired
@@ -257,12 +325,14 @@ make
 # output: build/wired
 ```
 
-**VERIFIED** alternate script (different SDK):
+**VERIFIED** alternate script (different SDK; also needs `vector-gobot`):
 
 ```bash
 cd anki/wired
 ./build.sh
 ```
+
+**VERIFIED** no-gobot path: see CGO_ENABLED=0 command above.
 
 ### Output
 
@@ -302,7 +372,14 @@ Script steps:
 3. `scp -r webroot/*` → `/etc/wired/webroot/`
 4. `systemctl start wired`
 
-SSH key: `~/ssh_root_key` (**VERIFIED** in script).
+SSH key: `~/ssh_root_key` (**VERIFIED** in script; on this machine it is a symlink to `anki/vic-cloudless/ssh_root_key`).
+
+Quick check after deploy:
+
+```bash
+ssh -i ~/ssh_root_key root@<ip> \
+  'systemctl is-active wired; curl -s http://127.0.0.1:8080/api/mods/Petting/get'
+```
 
 ---
 
@@ -378,6 +455,8 @@ make
 `deploy.sh` also deploys `xiaozhi-play-bridge` unit/script and restarts `anki-robot.target`.  
 Note: bridge files are in `deploy.sh` but **not** in `vic-cloudless.bb` `do_install` (**VERIFIED** gap) — OTA image may lack bridge unless added elsewhere (**UNVERIFIED** whether another recipe installs it).
 
+**Must re-run after victor hot-deploy** — see §3 “cloudless wipe”. Existing `build/vic-cloud` + `build/en-US/` can be redeployed without rebuilding if artifacts are already present (**VERIFIED** 2026-08-08).
+
 ---
 
 ## 6. Other services / packages
@@ -418,23 +497,99 @@ Reasons victor/wired/cloudless still appear in Yocto even though they have stand
 
 ## 8. Practical hot-deploy cheat sheet
 
-Assuming robot reachable by SSH (key `~/ssh_root_key` for wired/cloudless scripts) and a compatible base OTA:
+Assuming robot reachable by SSH (key `~/ssh_root_key` for wired/cloudless scripts) and a compatible base OTA.
+
+**Example robot used 2026-08-08:** `192.168.100.46` (**VERIFIED** end-to-end).
+
+### 8.0 Choose the lightest path first (**VERIFIED** lesson 2026-08-08)
+
+Full `victor_deploy_run` + `vic-cloudless/deploy.sh` is **slow** (often many minutes): rsync walks a huge `/anki` tree, **deletes cloudless**, then re-uploads ~70 MB Vosk models. Agents must **not** use that path for small edits.
+
+| What changed | Preferred deploy | Avoid |
+|--------------|------------------|--------|
+| Only `anki/wired/webroot/**` (HTML/JS/CSS/i18n) | `scp` files → `/etc/wired/webroot/` (no binary rebuild) | `send_to_bot.sh`, victor, cloudless |
+| Wired Go API/mod only | Build `build/wired` + `./send_to_bot.sh <ip>` | victor / cloudless |
+| Only engine C++ → `libcozmo_engine.so` (and/or `vic-engine`) | Build victor, then **binary scp** + restart service (§8.1) | Full `victor_deploy_run` (wipes cloudless) |
+| Only `vic-anim` binary | scp `bin/vic-anim` + `systemctl restart vic-anim` | Full victor rsync unless resources also changed |
+| Many `/anki` files, resources, or unsure | Full `victor_deploy_run` **then** `vic-cloudless/deploy.sh` | Skipping cloudless restore on cloudless robots |
+| Only Xiaozhi / `vic-cloud` / Vosk JSON | `vic-cloudless` `make` (if needed) + `./deploy.sh <ip>` | victor |
+
+**Rule of thumb:** if cloudless on the robot is already healthy and you only need one/two binaries under `/anki/bin` or `/anki/lib`, use **scp + restart** — do **not** full-rsync victor.
+
+### 8.1 Fast engine-only deploy (no cloudless wipe)
+
+**VERIFIED** pattern after `victor_build_release` (from repo root or adjust paths):
 
 ```bash
-# Wired UI / games / settings
-cd anki/wired && make && ./send_to_bot.sh 192.168.x.x          # VERIFIED script
+IP=192.168.x.x
+KEY=~/ssh_root_key
+ENG=anki/victor/_build/vicos/Release
 
-# Vic-cloudless / Xiaozhi cloud binary
-cd anki/vic-cloudless && make && ./deploy.sh 192.168.x.x       # VERIFIED script
-
-# Full /anki personality stack
-cd anki/victor && ./build/build-v.sh && ./build/deploy-v.sh    # VERIFIED README/scripts
+ssh -i "$KEY" root@$IP 'mount -o rw,remount /'
+# Typical engine C++ change:
+scp -i "$KEY" "$ENG/lib/libcozmo_engine.so" root@$IP:/anki/lib/
+scp -i "$KEY" "$ENG/bin/vic-engine" root@$IP:/anki/bin/   # if the executable changed
+ssh -i "$KEY" root@$IP 'systemctl restart vic-engine'
+# If anim also rebuilt: scp bin/vic-anim + systemctl restart vic-anim
 ```
 
-After deploy, typical checks (**UNVERIFIED** as mandatory, but commonly used):
+Optional lib after cmake install step: `_build/vicos/Release/dist/lib/libcozmo_engine.so` (**VERIFIED**).
+
+Verify without full deploy:
 
 ```bash
-ssh -i ~/ssh_root_key root@<ip> 'systemctl is-active wired vic-cloud anki-robot.target'
+ssh -i "$KEY" root@$IP \
+  'strings /anki/lib/libcozmo_engine.so | grep -F /data/wired/mods/Petting/touch_enabled'
+```
+
+### 8.2 Fast wired UI-only deploy
+
+```bash
+IP=192.168.x.x
+KEY=~/ssh_root_key
+ssh -i "$KEY" root@$IP 'mount -o rw,remount /'
+scp -i "$KEY" -r anki/wired/webroot/* root@$IP:/etc/wired/webroot/
+# No wired restart required for static files (browser hard-refresh).
+# Restart wired only if the Go binary/API changed (`send_to_bot.sh`).
+```
+
+### 8.3 Full stack commands (when actually needed)
+
+```bash
+# --- Wired UI + binary ---
+cd anki/wired
+CGO_ENABLED=0 GOARM=7 GOARCH=arm GOOS=linux \
+  "$HOME/.anki/go/dist/1.24.4/go/bin/go" build -tags vicos -ldflags '-w -s' -o build/wired main.go
+./send_to_bot.sh 192.168.x.x
+
+# --- Victor full /anki (wipes cloudless!) — bare metal ---
+cd anki/victor
+echo '192.168.x.x' > robot_ip.txt
+export PATH="$HOME/.local/bin:$PATH"
+./project/victor/scripts/victor_build_release.sh
+eval $(ssh-agent) && ssh-add robot_sshkey
+export ANKI_ROBOT_HOST=$(cat robot_ip.txt)
+./project/victor/scripts/victor_deploy_run.sh
+
+# --- REQUIRED after full victor on cloudless robots (~70MB, often slow) ---
+cd anki/vic-cloudless
+./deploy.sh 192.168.x.x
+```
+
+Docker wrappers (when Docker WSL integration works):
+
+```bash
+cd anki/victor && ./build/build-v.sh && ./build/deploy-v.sh
+# still re-run vic-cloudless deploy.sh afterward on cloudless bots
+```
+
+After **full** victor+cloudless deploy, typical checks:
+
+```bash
+ssh -i ~/ssh_root_key root@<ip> '
+  systemctl is-active wired vic-engine vic-anim vic-cloud anki-robot.target
+  test -f /anki/data/assets/cozmo_resources/cloudless/en-US/en-US.json && echo cloudless_ok
+'
 ```
 
 ---
@@ -444,9 +599,14 @@ ssh -i ~/ssh_root_key root@<ip> 'systemctl is-active wired vic-cloud anki-robot.
 1. **OTA filename:** README `3.0.1.<N>.ota` vs actual `vicos-3.0.1.<N>d.ota` (**VERIFIED**).
 2. **`build/deps.sh` missing** but referenced by `build/run.sh` / `shell.sh` (**VERIFIED**).
 3. **wired toolchain split:** `Makefile` = SDK 5.3.0-r07; `build.sh` = 4.0.0-r05 (**VERIFIED**).
-4. **wired `vector-gobot`:** required by `Makefile`; may be absent locally (**VERIFIED** absence in this tree).
+4. **wired `vector-gobot`:** required by `Makefile`; often absent locally — use `CGO_ENABLED=0` cross-build (**VERIFIED** 2026-08-08).
 5. **xiaozhi-play-bridge:** deployed by `deploy.sh`, not by `vic-cloudless.bb` install (**VERIFIED**).
 6. **fault-code unit vs install path mismatch** (**VERIFIED** in sources).
+7. **Victor Docker scripts need TTY/Docker:** `build-v.sh` / `deploy-v.sh` fail on WSL without Docker; use bare-metal scripts in §3 (**VERIFIED**).
+8. **`setenv.sh` aliases:** `vbuild` / `vdeploy` do not work in non-interactive shells — call `project/victor/scripts/*.sh` directly (**VERIFIED**).
+9. **ninja / ccache paths:** CMake may cache `/usr/bin/ninja` and generate `launch-*` with `/usr/bin/ccache` while only `$HOME/.local/bin/{ninja,ccache}` exist; ccache there is a passthrough shim (**VERIFIED**).
+10. **Victor rsync wipes cloudless:** full victor hot-deploy deletes `/anki/.../cloudless` and bridge extras — follow with `vic-cloudless/deploy.sh` (**VERIFIED** 2026-08-08). Prefer §8.1 binary scp when only engine/anim changed to **avoid** the wipe and the slow ~70 MB restore.
+11. **Slow deploy anti-pattern:** running full victor + cloudless for a webroot typo or single `.so` change wastes minutes; use §8.0 table (**VERIFIED** lesson).
 
 ---
 
@@ -454,22 +614,25 @@ ssh -i ~/ssh_root_key root@<ip> 'systemctl is-active wired vic-cloud anki-robot.
 
 | User asks… | Read section |
 |------------|--------------|
-| “build wired” / deploy wired / web UI | §4 Wired (+ §8 hot-deploy) |
-| “build victor” / deploy `/anki` / anim/engine | §3 Victor (+ §8) |
+| “build wired” / deploy wired / web UI | §4 + **§8.0 / §8.2** (UI-only = scp webroot) |
+| “build victor” / deploy `/anki` / anim/engine | §3 + **§8.0 / §8.1** first; full §8.3 only if needed |
 | “build vic-cloudless” / Xiaozhi cloud / vic-cloud Go | §5 Vic-cloudless (+ §8) |
 | “build OTA” / full image / Yocto / `vicos-*.ota` | §2 → chạy `./build/build.sh -bt devcloudless -v 100` |
-| “build service vic-anim / vic-engine / …” | §6 (bins from Victor) + §3 |
-| “hot deploy” / replace binary only | §8 + matching component section |
+| “build service vic-anim / vic-engine / …” | §6 (bins from Victor) + §3 + **§8.1** |
+| “hot deploy” / replace binary only | **§8.0 decision table** |
 | “cloudless image” | §2 (cùng lệnh OTA mặc định) + §5 |
 | “where is the OTA file?” | §2 → `_build/vicos-3.0.1.100d.ota` (hoặc `.<N>d.ota` theo `-v`) |
+| “deploy chậm / wipe cloudless” | §8.0–§8.1 + trap §9.10–11 |
 | Git commit/push of build changes | `docs/GIT_SUBMODULE_WORKFLOW.md` |
 
-**Agent checklist before running a build**
+**Agent checklist before running a build/deploy**
 
 1. Confirm which component the user wants (wired / victor / cloudless / full OTA).  
-2. Full OTA → **only** `./build/build.sh -bt devcloudless -v 100` (đổi `-v` nếu user chỉ định).  
-3. Open the matching section; prefer **VERIFIED** commands.  
-4. Check toolchain/SDK presence (`~/.anki/vicos-sdk`, Go dist) before `make`.  
-5. For hot-deploy, confirm robot IP + SSH key; remount/rootfs implications are in the scripts.  
-6. Do not claim a command works if marked **UNVERIFIED**.  
-7. After code changes, follow `docs/GIT_SUBMODULE_WORKFLOW.md` for commit/push order.
+2. **Pick the lightest deploy from §8.0** before starting any full rsync.  
+3. Full OTA → **only** `./build/build.sh -bt devcloudless -v 100` (đổi `-v` nếu user chỉ định).  
+4. Open the matching section; prefer **VERIFIED** commands.  
+5. Check toolchain/SDK presence (`~/.anki/vicos-sdk`, Go dist) before `make`.  
+6. If doing **full** victor deploy to a cloudless robot → plan `vic-cloudless/deploy.sh` (slow); if only `.so`/one binary → §8.1 instead.  
+7. On WSL without Docker → bare-metal victor scripts + fix ninja/ccache paths (§3).  
+8. Do not claim a command works if marked **UNVERIFIED**.  
+9. After code changes, follow `docs/GIT_SUBMODULE_WORKFLOW.md` for commit/push order.
