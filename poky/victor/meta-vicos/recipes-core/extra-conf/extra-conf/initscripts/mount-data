@@ -94,10 +94,14 @@ make_userdata() {
   mkdir -p /data/usb
   #camera
   mkdir -p /data/misc/camera
-  #data
-  mkdir -p /data/data/com.anki.victor
+  #data — include persistent/switchboard so vic-switchboard (net) can
+  # write BLE sessions after wipe. Missing this + root-owned persistent/
+  # causes fault 913.
+  mkdir -p /data/data/com.anki.victor/persistent/switchboard
+  mkdir -p /data/data/com.anki.victor/cache
   chown -R anki:anki /data/data/com.anki.victor
   chmod -R 770 /data/data/com.anki.victor
+  chown -R net:anki /data/data/com.anki.victor/persistent/switchboard
   #vic-gateway
   mkdir -p /data/vic-gateway
   chown -R net:anki /data/vic-gateway
