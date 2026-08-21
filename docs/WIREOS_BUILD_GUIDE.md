@@ -224,6 +224,8 @@ Systemd units for individual services are separate tiny recipes (`vic-anim.bb`, 
 
 ### OTA vs binary replace
 
+> **WiFi / fault 917:** Never call `vic-setup-ap off` unconditionally from ConnMan `DisableAccessPointMode`. See [wifi-setup-ap-boot-917-2026-08-21.md](./wifi-setup-ap-boot-917-2026-08-21.md).
+
 | Goal | Approach |
 |------|----------|
 | Ship in official image | Full Yocto OTA |
