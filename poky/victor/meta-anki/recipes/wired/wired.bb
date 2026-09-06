@@ -114,12 +114,17 @@ do_compile() {
 
 do_install () {
     install -d ${D}/usr/bin
+    install -d ${D}/anki/bin
     install -d ${D}/etc/wired
     install -p -m 0755 ${WORKSPACE}/anki/wired/build/wired ${D}/usr/bin/
+    install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/vic-setup-ap ${D}/usr/bin/vic-setup-ap
+    install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/vic-setup-ap ${D}/anki/bin/vic-setup-ap
     cp -R --no-dereference --preserve=mode,links -v ${WORKSPACE}/anki/wired/webroot ${D}/etc/wired/webroot
 }
 
 FILES:${PN} += "usr/bin/wired"
+FILES:${PN} += "usr/bin/vic-setup-ap"
+FILES:${PN} += "anki/bin/vic-setup-ap"
 FILES:${PN} += "etc/wired/webroot"
 
 FILES:${PN}-dev = ""
