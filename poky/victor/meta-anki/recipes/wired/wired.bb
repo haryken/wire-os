@@ -3,9 +3,9 @@ LICENSE = "Anki-Inc.-Proprietary"
 LIC_FILES_CHKSUM = "file://${COREBASE}/../victor/meta-qcom/files/anki-licenses/\                           
 Anki-Inc.-Proprietary;md5=4b03b8ffef1b70b13d869dbce43e8f09"
 
-SERVICE_FILE = "wired.service"
+SERVICE_FILES = "wired.service wireos-hotspot-manager.service wireos-hotspot-portal.service"
 
-SRC_URI = "file://${SERVICE_FILE}"
+SRC_URI = "file://wired.service file://wireos-hotspot-manager.service file://wireos-hotspot-portal.service"
 S = "${UNPACKDIR}"
 #UNPACKDIR = "${S}"
 
@@ -14,14 +14,16 @@ inherit systemd
 do_install:append () {
    if ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'true', 'false', d)}; then
        install -d ${D}${systemd_unitdir}/system/
-       install -m 0644 ${S}/${SERVICE_FILE} -D ${D}${systemd_unitdir}/system/${SERVICE_FILE}
+       for service in ${SERVICE_FILES}; do
+           install -m 0644 ${S}/${service} -D ${D}${systemd_unitdir}/system/${service}
+       done
    fi
 }
 
 RDEPENDS:${PN} += "victor"
 DEPENDS += "victor"
 FILES:${PN} += "${systemd_unitdir}/system/"
-SYSTEMD_SERVICE:${PN} = "${SERVICE_FILE}"
+SYSTEMD_SERVICE:${PN} = "${SERVICE_FILES}"
 
 inherit externalsrc
 
@@ -117,13 +119,17 @@ do_install () {
     install -d ${D}/anki/bin
     install -d ${D}/etc/wired
     install -p -m 0755 ${WORKSPACE}/anki/wired/build/wired ${D}/usr/bin/
+    install -p -m 0755 ${WORKSPACE}/anki/wired/build/wireos-hotspot-portal ${D}/usr/bin/
     install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/vic-setup-ap ${D}/usr/bin/vic-setup-ap
+    install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/wireos-hotspot-manager ${D}/usr/bin/wireos-hotspot-manager
     install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/vic-setup-ap ${D}/anki/bin/vic-setup-ap
     cp -R --no-dereference --preserve=mode,links -v ${WORKSPACE}/anki/wired/webroot ${D}/etc/wired/webroot
 }
 
 FILES:${PN} += "usr/bin/wired"
+FILES:${PN} += "usr/bin/wireos-hotspot-portal"
 FILES:${PN} += "usr/bin/vic-setup-ap"
+FILES:${PN} += "usr/bin/wireos-hotspot-manager"
 FILES:${PN} += "anki/bin/vic-setup-ap"
 FILES:${PN} += "etc/wired/webroot"
 

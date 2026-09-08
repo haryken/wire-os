@@ -24,8 +24,6 @@ IMAGE_INSTALL += "${@oe.utils.conditional('CLOUDLESS', '1', 'vic-cloudless', 'vi
 # Wire things
 IMAGE_INSTALL += "wired"
 IMAGE_INSTALL += "libpvictor"
-# Captive portal DNS for open setup AP (vic-setup-ap); wired also has a :53 fallback.
-IMAGE_INSTALL += "dnsmasq"
 
 IMAGE_INSTALL += "avahi-daemon"
 IMAGE_INSTALL += "${@oe.utils.conditional('USER_BUILD', '1', '', 'neofetch', d)}"

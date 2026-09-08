@@ -1,0 +1,14 @@
+[Unit]
+Description=WireOS isolated WiFi setup portal
+After=ankiinit.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/logwrapper /usr/bin/wireos-hotspot-portal
+Restart=on-failure
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

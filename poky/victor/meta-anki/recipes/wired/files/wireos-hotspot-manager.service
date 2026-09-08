@@ -1,0 +1,16 @@
+[Unit]
+Description=WireOS isolated WiFi setup hotspot manager
+After=ankiinit.service wireos-hotspot-portal.service
+Wants=wireos-hotspot-portal.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wireos-hotspot-manager
+ExecStop=/bin/sh -c '[ ! -f /run/wireos-setup-ap ] || /usr/bin/vic-setup-ap off'
+Restart=always
+RestartSec=5
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

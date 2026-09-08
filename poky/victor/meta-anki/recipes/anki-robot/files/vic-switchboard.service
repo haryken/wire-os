@@ -12,12 +12,6 @@ EnvironmentFile=/anki/etc/vic-switchboard.env
 ExecStartPre=/bin/chown net:anki /dev/block/bootdevice/by-name/switchboard
 ExecStartPre=/bin/mkdir -p /run/vic-switchboard
 ExecStartPre=/bin/chown -R net:anki /run/vic-switchboard
-# After wipe, persistent/switchboard must exist and be writable by User=net
-# or MigrateKeys fails and the robot loops fault 913.
-ExecStartPre=/bin/mkdir -p /data/data/com.anki.victor/persistent/switchboard
-ExecStartPre=/bin/chown anki:anki /data/data/com.anki.victor /data/data/com.anki.victor/persistent
-ExecStartPre=/bin/chmod 770 /data/data/com.anki.victor /data/data/com.anki.victor/persistent /data/data/com.anki.victor/persistent/switchboard
-ExecStartPre=/bin/chown -R net:anki /data/data/com.anki.victor/persistent/switchboard
 ExecStart=/usr/bin/logwrapper /anki/bin/vic-switchboard $VIC_SWITCHBOARD_OPTS
 ExecStopPost=/anki/bin/vic-on-exit
 Restart=no

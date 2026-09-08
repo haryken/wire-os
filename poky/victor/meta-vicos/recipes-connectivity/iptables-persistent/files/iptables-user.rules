@@ -20,19 +20,7 @@
 -A OUTPUT -p ALL -o tether -j ACCEPT
 
 # Accept DHCP traffic (Access Point mode)
-# WireOS open AP uses wlan0 (vic-setup-ap); ConnMan tether uses tether.
 -A INPUT -p udp -m udp --dport 67 -i tether -j ACCEPT
--A INPUT -p udp -m udp --dport 68 -i tether -j ACCEPT
--A INPUT -p udp -m udp --dport 67 -i wlan0 -j ACCEPT
--A INPUT -p udp -m udp --dport 68 -i wlan0 -j ACCEPT
--A INPUT -p udp -m udp --dport 67 -j ACCEPT
--A INPUT -p udp -m udp --dport 68 -j ACCEPT
-
-# Captive DNS when AP is up (dnsmasq / phone captive probes)
--A INPUT -p udp -m udp --dport 53 -i wlan0 -j ACCEPT
--A INPUT -p tcp -m tcp --dport 53 -i wlan0 -j ACCEPT
--A INPUT -p udp -m udp --dport 53 -i tether -j ACCEPT
--A INPUT -p tcp -m tcp --dport 53 -i tether -j ACCEPT
 
 # Accept 443 traffic (vic-gateway)
 -A INPUT -p tcp -m tcp --dport 443 -j ACCEPT
@@ -43,8 +31,7 @@
 # Allow ping
 -A INPUT -p icmp -m icmp --icmp-type 8 -m conntrack --ctstate NEW -j ACCEPT
 
-# Allow wired (captive portal on :80 + settings UI on :8080)
--A INPUT -p tcp -m tcp --dport 80 -j ACCEPT
+# Allow wired
 -A INPUT -p tcp -m tcp --dport 8080 -j ACCEPT
 
 COMMIT
