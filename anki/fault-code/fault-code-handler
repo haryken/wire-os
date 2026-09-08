@@ -72,12 +72,14 @@ function get_uptime () {
 
 log "fault-code-handler start"
 
-# Read up to 7 chars (max code is UINT16_MAX, newline, null) from stdin with a 1 sec timeout
-# If run from systemd, stdin will be our fault_code FIFO socket
-read -r -n 7 -t 1 FAULT_CODE
-
-if [ $? -ne 0 ]; then
-    # read error
+# Read up to 7 chars (max code is UINT16_MAX, newline, null) from stdin.
+# If run from systemd, stdin will be our fault_code FIFO socket. Under heavy
+# startup load the writer can arrive more than one second after socket
+# activation. Also accept a partial value when the writer closes without a
+# newline: bash read returns non-zero on EOF even though it populated the
+# variable.
+FAULT_CODE=""
+if ! read -r -n 7 -t 5 FAULT_CODE && [ -z "${FAULT_CODE}" ]; then
     loge "Unable to read fault code"
     exit -1
 fi

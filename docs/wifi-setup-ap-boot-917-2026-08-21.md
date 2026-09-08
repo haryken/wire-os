@@ -51,3 +51,84 @@ systemctl is-active vic-anim vic-robot vic-switchboard
 ```
 
 Kỳ vọng: `vic-setup-ap` = 0 (hoặc chỉ khi đang join/AP có chủ đích), `917` = 0 lúc boot idle.
+
+## Incident 2026-09-08: AP không bật nhưng vẫn fault 917
+
+### Dấu hiệu và cách phân biệt
+
+Robot đã nối WiFi nhà (`State = online`, có IP LAN trên `wlan0`), không có
+`192.168.4.1`, không có `/run/wireos-setup-ap`, `hostapd` hay `dnsmasq`, nhưng
+vẫn có:
+
+```text
+HAL.RadioSendPacket.FailedToSend
+CozmoBot.Radio.Disconnected
+AnimProcessMessages.Update.RobotStateTimeout
+DisplayFaultCode: 917
+```
+
+Tên `Radio` ở đây là Unix datagram IPC nội bộ giữa `vic-robot` và `vic-anim`
+(`/dev/socket/_anim_robot_*`), không phải radio WiFi.
+
+### Nguyên nhân hồi quy
+
+Phần menu WiFi/hotspot đã gọi `RebuildMainMenu()` từ mỗi tick của
+`FaceInfoScreenManager::Update()`. Dù có cache một giây, đường này vẫn định kỳ:
+
+- đọc mode từ `/run`, `/data` và `/persist`;
+- hỏi trạng thái SSID/IP;
+- chạy trên thread realtime của `vic-anim`.
+
+Bản không có hotspot không đưa I/O này vào vòng animation. Khi flash hoặc truy
+cập trạng thái bị chậm lúc boot, `vic-anim` không xử lý `RobotState` kịp. Timeout
+hai giây cũ ngắt IPC và lập tức phát fault 917.
+
+### Fix 2026-09-08
+
+1. Không gọi `RebuildMainMenu()` mỗi animation tick. Menu được dựng khi vào màn
+   hình Main và trong nhịp redraw 20 giây đã có sẵn.
+2. `wired` đọc mode bền vững từ `/data`/`persist`, rồi mirror sang
+   `/run/wireos-wifi-setup-mode` (tmpfs).
+3. `vic-anim` chỉ đọc mirror `/run`; không đọc flash trong đường render.
+4. Timeout `RobotState` tăng từ 2 lên 5 giây. Nếu socket mất, `vic-anim` thử
+   reconnect mỗi 0,5 giây; chỉ phát 917 sau 15 giây thất bại liên tục.
+5. `fault-code-handler` chờ FIFO 5 giây thay vì 1 giây và chấp nhận dữ liệu đã
+   đọc trước EOF. Điều này tránh handler bỏ mã 917 rồi để robot kẹt.
+
+### Gate bật hotspot khi boot
+
+Không bật AP chỉ vì mode đã lưu là `hotspot`:
+
+- Có WiFi nhà và IP LAN: luôn giữ AP tắt.
+- Đã association nhưng chờ DHCP: chờ tối đa 75 giây, không bật AP.
+- Có profile WiFi đã lưu: cho ConnMan tối đa 120 giây tự nối.
+- Chỉ sau các kiểm tra trên, khi thực sự offline, mới gọi `vic-setup-ap on`.
+
+### Quy tắc realtime bắt buộc
+
+- Không đọc `/data`, `/persist`, chạy `curl`, `system()` đồng bộ hoặc gọi
+  ConnMan từ hàm chạy mỗi tick của `vic-anim`.
+- Dữ liệu từ service khác phải mirror qua `/run` hoặc truyền bằng IPC; phần
+  persist thuộc process nền như `wired`.
+- Mọi thay đổi WiFi/menu mặt phải smoke test lâu hơn cửa sổ lỗi cũ (ít nhất
+  3 phút), không chỉ kiểm tra service vừa lên.
+- Khi thấy `HAL.RadioSendPacket`, kiểm tra đường IPC trước; không mặc định kết
+  luận đó là WiFi/hotspot.
+
+## Smoke commands bổ sung
+
+```bash
+connmanctl state
+ip -4 addr show wlan0
+test -f /run/wireos-setup-ap && echo AP_ON || echo AP_OFF
+cat /run/wireos-wifi-setup-mode
+
+journalctl -b --no-pager | \
+  grep -E 'RadioSendPacket.Failed|RobotStateTimeout|RobotReconnected|DisplayFaultCode: 917'
+
+systemctl is-active wired anki-robot.target vic-robot vic-anim vic-engine vic-cloud
+```
+
+Khi WiFi nhà đã kết nối: kỳ vọng `AP_OFF`, tất cả service `active`, và không có
+`RobotStateTimeout`/917. `RobotReconnected` chỉ được phép xuất hiện khi IPC thật
+sự bị gián đoạn và phải tự phục hồi mà không restart toàn stack.
