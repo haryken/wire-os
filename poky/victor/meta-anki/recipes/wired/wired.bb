@@ -15,7 +15,7 @@ do_install:append () {
    if ${@bb.utils.contains('DISTRO_FEATURES', 'systemd', 'true', 'false', d)}; then
        install -d ${D}${systemd_unitdir}/system/
        for service in ${SERVICE_FILES}; do
-           install -m 0644 ${S}/${service} -D ${D}${systemd_unitdir}/system/${service}
+           install -m 0644 ${UNPACKDIR}/${service} -D ${D}${systemd_unitdir}/system/${service}
        done
    fi
 }
@@ -124,6 +124,7 @@ do_install () {
     install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/wireos-hotspot-manager ${D}/usr/bin/wireos-hotspot-manager
     install -p -m 0755 ${WORKSPACE}/anki/wired/scripts/vic-setup-ap ${D}/anki/bin/vic-setup-ap
     cp -R --no-dereference --preserve=mode,links -v ${WORKSPACE}/anki/wired/webroot ${D}/etc/wired/webroot
+    cp -R --no-dereference --preserve=mode,links -v ${WORKSPACE}/anki/wired/hotspot-webroot ${D}/etc/wired/hotspot-webroot
 }
 
 FILES:${PN} += "usr/bin/wired"
@@ -132,6 +133,7 @@ FILES:${PN} += "usr/bin/vic-setup-ap"
 FILES:${PN} += "usr/bin/wireos-hotspot-manager"
 FILES:${PN} += "anki/bin/vic-setup-ap"
 FILES:${PN} += "etc/wired/webroot"
+FILES:${PN} += "etc/wired/hotspot-webroot"
 
 FILES:${PN}-dev = ""
 do_package_qa[noexec] = "1"
